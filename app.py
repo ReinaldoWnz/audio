@@ -17,27 +17,27 @@ if uploaded_file is not None:
         input_path = tmp_file.name
 
     st.write("🔄 Carregando modelo de remoção de ruído...")
-    # Modelo correto para enhancement (Speech Enhancement)
+    # Carrega o modelo de aprimoramento de áudio
     enhance_model = SpectralMaskEnhancement.from_hparams(
         source="speechbrain/denoiser/mimic-voicebank",
         savedir="pretrained_model",
-        run_opts={"device":"cpu"}  # CPU para Streamlit Cloud
+        run_opts={"device": "cpu"}  # Utiliza CPU no Streamlit Cloud
     )
 
     st.write("🔄 Processando áudio...")
-    # Carrega áudio
+    # Carrega o áudio
     noisy, fs = torchaudio.load(input_path)
 
-    # Aplica melhoria
+    # Aplica o aprimoramento
     enhanced = enhance_model.enhance_batch(noisy, fs)
 
-    # Salva resultado temporário
+    # Salva o áudio aprimorado
     output_path = input_path.replace(".wav", "_enhanced.wav")
     torchaudio.save(output_path, enhanced, fs)
 
     st.success("✅ Áudio processado com sucesso!")
 
-    # Player para ouvir resultado
+    # Player para ouvir o resultado
     st.audio(output_path, format="audio/wav")
 
     # Link para download
@@ -49,5 +49,5 @@ if uploaded_file is not None:
             mime="audio/wav"
         )
 
-    # Limpeza
+    # Limpeza dos arquivos temporários
     os.remove(input_path)
