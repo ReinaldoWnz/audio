@@ -1,6 +1,7 @@
 import streamlit as st
 import torchaudio
 from speechbrain.pretrained import SpectralMaskEnhancement
+from huggingface_hub import snapshot_download
 import tempfile
 import os
 
@@ -16,17 +17,22 @@ if uploaded_file is not None:
         tmp_file.write(uploaded_file.read())
         input_path = tmp_file.name
 
-    # Carrega modelo SpeechBrain
-    st.write("🔄 Carregando modelo e processando áudio...")
+    # Baixa modelo do Hugging Face Hub
+    st.write("🔄 Baixando modelo SpeechBrain (primeira vez pode demorar)...")
+    model_dir = snapshot_download("speechbrain/mtl-mimic-voicebank")
+
+    # Carrega modelo
+    st.write("🔄 Processando áudio...")
     enhance_model = SpectralMaskEnhancement.from_hparams(
-        source="speechbrain/mtl-mimic-voicebank",
-        savedir="pretrained_model"
+        source=model_dir,
+        savedir="pretrained_model",
+        run_opts={"device": "cpu"}  # Streamlit Cloud normalmente só tem CPU
     )
 
     # Carrega áudio
     noisy, fs = torchaudio.load(input_path)
 
-    # Processa
+    # Aplica melhoria
     enhanced = enhance_model.enhance_batch(noisy, fs)
 
     # Salva resultado temporário
