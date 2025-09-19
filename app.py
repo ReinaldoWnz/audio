@@ -1,51 +1,47 @@
 import streamlit as st
-import torchaudio
-from speechbrain.pretrained import SpectralMaskEnhancement
+import noisereduce as nr
+import librosa
+import soundfile as sf
 import tempfile
 import os
 
-# Título do app
-st.title("🎙️ Melhorar Áudio com SpeechBrain")
+st.title("🎙️ Limpeza de Áudio com Noisereduce")
 
 # Upload do arquivo de áudio
 uploaded_file = st.file_uploader("Faça upload de um arquivo de áudio (WAV ou MP3)", type=["wav", "mp3"])
 
 if uploaded_file is not None:
-    # Salva o arquivo temporariamente
+    # Salva arquivo temporário
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         tmp_file.write(uploaded_file.read())
         input_path = tmp_file.name
 
-    st.write("🔄 Carregando modelo de remoção de ruído...")
-    # Carrega o modelo de aprimoramento de áudio
-    enhance_model = SpectralMaskEnhancement.from_hparams(
-        source="speechbrain/denoiser/mimic-voicebank",
-        savedir="pretrained_model",
-        run_opts={"device": "cpu"}  # Utiliza CPU no Streamlit Cloud
-    )
+    st.write("🔄 Carregando e processando áudio...")
 
-    st.write("🔄 Processando áudio...")
-    # Carrega o áudio
-    noisy, fs = torchaudio.load(input_path)
+    # Carrega áudio
+    y, sr = librosa.load(input_path, sr=None)
 
-    # Aplica o aprimoramento
-    enhanced = enhance_model.enhance_batch(noisy, fs)
+    # Estima ruído (primeiros 0.5s)
+    noise_sample = y[0:int(sr*0.5)]
 
-    # Salva o áudio aprimorado
-    output_path = input_path.replace(".wav", "_enhanced.wav")
-    torchaudio.save(output_path, enhanced, fs)
+    # Aplica redução de ruído
+    reduced_noise = nr.reduce_noise(y=y, y_noise=noise_sample, sr=sr)
+
+    # Salva áudio processado
+    output_path = input_path.replace(".wav", "_clean.wav")
+    sf.write(output_path, reduced_noise, sr)
 
     st.success("✅ Áudio processado com sucesso!")
 
-    # Player para ouvir o resultado
+    # Player para ouvir resultado
     st.audio(output_path, format="audio/wav")
 
-    # Link para download
+    # Botão para download
     with open(output_path, "rb") as f:
         st.download_button(
-            label="📥 Baixar áudio melhorado",
+            label="📥 Baixar áudio limpo",
             data=f,
-            file_name="audio_enhanced.wav",
+            file_name="audio_clean.wav",
             mime="audio/wav"
         )
 
