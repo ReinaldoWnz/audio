@@ -1,49 +1,84 @@
 import streamlit as st
-import noisereduce as nr
 import librosa
 import soundfile as sf
-import tempfile
-import os
+import numpy as np
+import io
 
-st.title("🎙️ Limpeza de Áudio com Noisereduce")
+# Título da aplicação
+st.title("Ferramenta de Aprimoramento de Áudio")
 
-# Upload do arquivo de áudio
-uploaded_file = st.file_uploader("Faça upload de um arquivo de áudio (WAV ou MP3)", type=["wav", "mp3"])
+# Descrição
+st.markdown("Faça o upload de um arquivo de áudio para remover ruído de fundo.")
+st.markdown("---")
+
+def enhance_audio(audio_data):
+    """
+    Processa os dados de áudio para reduzir o ruído e retorna o áudio aprimorado.
+    
+    Esta é uma demonstração simplificada de aprimoramento de áudio. Para uma
+    abordagem mais robusta (como a do Adobe Podcast), um modelo de IA treinado
+    seria necessário.
+    
+    Args:
+        audio_data (io.BytesIO): O objeto de arquivo de áudio carregado.
+    
+    Returns:
+        np.ndarray: O array NumPy com o áudio aprimorado.
+        int: A taxa de amostragem (sample rate) do áudio.
+    """
+    try:
+        # Carrega o áudio a partir dos dados do arquivo
+        y, sr = librosa.load(audio_data, sr=None)
+
+        # Gera o espectrograma do áudio
+        S = librosa.stft(y)
+        S_magnitude, S_phase = librosa.magphase(S)
+
+        # Aplica uma filtragem simples baseada na magnitude para demonstrar a redução de ruído.
+        # Filtra frequências de baixa magnitude (que geralmente representam ruído).
+        S_magnitude_filtered = np.where(S_magnitude > 0.02, S_magnitude, 0)
+        
+        # Reconstrói o sinal de áudio a partir do espectrograma filtrado
+        y_enhanced = librosa.istft(S_magnitude_filtered * S_phase)
+        
+        return y_enhanced, sr
+    
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao processar o áudio: {e}")
+        return None, None
+
+# Widget para upload de arquivo
+uploaded_file = st.file_uploader("Escolha um arquivo de áudio", type=["wav", "mp3"])
 
 if uploaded_file is not None:
-    # Salva arquivo temporário
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-        tmp_file.write(uploaded_file.read())
-        input_path = tmp_file.name
+    # Mostra um "spinner" enquanto o arquivo está sendo processado
+    with st.spinner("Processando áudio... Isso pode levar alguns segundos."):
+        # Processa o áudio carregado
+        enhanced_audio, sr = enhance_audio(uploaded_file)
 
-    st.write("🔄 Carregando e processando áudio...")
-
-    # Carrega áudio
-    y, sr = librosa.load(input_path, sr=None)
-
-    # Estima ruído (primeiros 0.5s)
-    noise_sample = y[0:int(sr*0.5)]
-
-    # Aplica redução de ruído
-    reduced_noise = nr.reduce_noise(y=y, y_noise=noise_sample, sr=sr)
-
-    # Salva áudio processado
-    output_path = input_path.replace(".wav", "_clean.wav")
-    sf.write(output_path, reduced_noise, sr)
-
-    st.success("✅ Áudio processado com sucesso!")
-
-    # Player para ouvir resultado
-    st.audio(output_path, format="audio/wav")
-
-    # Botão para download
-    with open(output_path, "rb") as f:
+    if enhanced_audio is not None:
+        st.success("Áudio processado com sucesso!")
+        
+        # Converte o áudio aprimorado para o formato WAV
+        buffer = io.BytesIO()
+        sf.write(buffer, enhanced_audio, sr, format='WAV')
+        
+        # Adiciona o player de áudio para pré-visualização
+        st.subheader("Pré-visualização do Áudio Aprimorado")
+        st.audio(buffer.getvalue(), format='audio/wav')
+        
+        # Adiciona um botão de download para o arquivo aprimorado
         st.download_button(
-            label="📥 Baixar áudio limpo",
-            data=f,
-            file_name="audio_clean.wav",
+            label="Baixar Áudio Aprimorado",
+            data=buffer.getvalue(),
+            file_name="audio_aprimorado.wav",
             mime="audio/wav"
         )
 
-    # Limpeza dos arquivos temporários
-    os.remove(input_path)
+# Instruções de uso
+st.markdown("---")
+st.subheader("Como usar este aplicativo:")
+st.markdown("1. Salve este código como `app.py`.")
+st.markdown("2. Certifique-se de que o **Streamlit** e as bibliotecas necessárias estão instalados: `pip install streamlit librosa soundfile numpy`.")
+st.markdown("3. Execute o aplicativo a partir do seu terminal: `streamlit run app.py`.")
+st.markdown("4. Carregue um arquivo `.wav` ou `.mp3` na interface do navegador.")
