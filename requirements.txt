@@ -1,6 +1,5 @@
 streamlit
 librosa
 soundfile
-noisereduce
 numpy
-scipy
+io
